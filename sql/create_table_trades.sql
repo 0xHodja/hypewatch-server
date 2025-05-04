@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS public.trades (
     user_buyer TEXT NOT NULL,
     user_seller TEXT NOT NULL,
     CONSTRAINT trades_pkey PRIMARY KEY (tid, coin, "time")
-)
+);
 SELECT create_hypertable('trades', 'time');

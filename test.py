@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-data_folder = os.path.dirname(__file__)
+data_folder = os.path.dirname(__file__, "./temp_data")
 
 WS_URL = "wss://api.hyperliquid.xyz/ws"
 

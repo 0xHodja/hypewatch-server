@@ -33,40 +33,125 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-# Database handler
-class DatabaseHandler:
+class WebsocketListener:
     def __init__(self):
         self.conn = None
 
-    def connect(self):
+    def db_connect(self):
+        if self.conn is not None and self.conn.closed == 0:
+            return
         if self.conn is None:
-            self.conn = psycopg2.connect(dbname=DB_DATABASE, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+            try:
+                self.conn = psycopg2.connect(dbname=DB_DATABASE, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+                logger.info("Connected to the database")
+            except Exception as e:
+                logger.error(f"Error connecting to the database: {e}")
+                raise
 
-    def insert_candle(self, data):
-        pass
+    def db_disconnect(self):
+        if self.conn is not None:
+            self.conn.close()
+            self.conn = None
 
-    def insert_trade(self, data):
-        pass
+    def db_insert_candle(self, data):
+        candle = data
+        try:
+            self.db_connect()
+            t, s, i, o, c, h, l, v = candle.get("t"), candle.get("s"), candle.get("i"), candle.get("o"), candle.get("c"), candle.get("h"), candle.get("l"), candle.get("v")
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    INSERT INTO candles (t, s, i, o, c, h, l, v)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (t, s, i) DO UPDATE SET
+                        o = EXCLUDED.o,
+                        c = EXCLUDED.c,
+                        h = EXCLUDED.h,
+                        l = EXCLUDED.l,
+                        v = EXCLUDED.v
+                    """,
+                    (t, s, i, o, c, h, l, v),
+                )
+                self.conn.commit()
+        except Exception as e:
+            logger.error(f"Error inserting candle data: {e}")
+        finally:
+            pass
 
+    def db_insert_trade(self, data):
+        for trade in data:
+            try:
+                self.db_connect()
+                coin, side, px, sz, time, hash, tid, user_buyer, user_seller = trade.get("coin"), trade.get("side"), trade.get("px"), trade.get("sz"), int(trade.get("time")), trade.get("hash"), trade.get("tid"), trade.get("users")[0], trade.get("users")[1]
+                with self.conn.cursor() as cur:
+                    cur.execute(
+                        f"""
+                        INSERT INTO trades (coin, side, px, sz, time, hash, tid, user_buyer, user_seller)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (tid, coin, time) DO UPDATE SET
+                            side = EXCLUDED.side,
+                            px = EXCLUDED.px,
+                            sz = EXCLUDED.sz,
+                            hash = EXCLUDED.hash,
+                            user_buyer = EXCLUDED.user_buyer,
+                            user_seller = EXCLUDED.user_seller
+                        """,
+                        (coin, side, px, sz, time, hash, tid, user_buyer, user_seller),
+                    )
+                    self.conn.commit()
+            except Exception as e:
+                logger.error(f"Error inserting trade data: {e}")
+            finally:
+                pass
 
-class WebsocketListener:
-    def __init__(self, db_handler):
-        self.db_handler = db_handler
-
-    async def listen(self):
+    async def listen_trades(self):
         async with websockets.connect(websocket_url) as websocket:
-            await websocket.send(json.dumps({"type": "subscribe", "channels": ["candles", "trades"]}))
+            subscribe_message = {"method": "subscribe", "subscription": {"type": "trades", "coin": "@107"}}
+            await websocket.send(json.dumps(subscribe_message))
 
             while True:
                 try:
-                    message = await websocket.recv()
-                    data = json.loads(message)
-                    logger.info(f"Received data: {data}")
-
-                    if data["type"] == "candles":
-                        self.db_handler.insert_candle(data)
-                    elif data["type"] == "trades":
-                        self.db_handler.insert_trade(data)
+                    response = await websocket.recv()
+                    data = json.loads(response)
+                    if data.get("channel") == "trades":
+                        logger.info(f"Received data: {data}")
+                        trade_data = data.get("data")
+                        if trade_data:
+                            self.db_insert_trade(trade_data)
 
                 except Exception as e:
                     logger.error(f"Error processing message: {e}")
+
+    async def listen_candles(self):
+        async with websockets.connect(websocket_url) as websocket:
+            subscribe_message = {"method": "subscribe", "subscription": {"type": "candle", "coin": "@107", "interval": "1m"}}
+            await websocket.send(json.dumps(subscribe_message))
+
+            while True:
+                try:
+                    response = await websocket.recv()
+                    data = json.loads(response)
+                    if data.get("channel") == "candle":
+                        logger.info(f"Received data: {data}")
+                        candle_data = data.get("data")
+                        if candle_data:
+                            self.db_insert_candle(candle_data)
+
+                except Exception as e:
+                    logger.error(f"Error processing message: {e}")
+
+    async def listen(self):
+        try:
+            await asyncio.gather(self.listen_trades(), self.listen_candles())
+        except Exception as e:
+            logger.error(f"Error in main loop: {e}")
+        except KeyboardInterrupt:
+            logger.info("WebSocket connection closed by user.")
+        finally:
+            self.db_disconnect()
+            logger.info("Database connection closed.")
+
+
+if __name__ == "__main__":
+    listener = WebsocketListener()
+    asyncio.run(listener.listen())

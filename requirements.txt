@@ -1,0 +1,8 @@
+dotenv
+requests
+datetime
+pandas
+hyperliquid-python-sdk
+numpy
+psycopg2
+websockets

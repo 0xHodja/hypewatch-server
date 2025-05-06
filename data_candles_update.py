@@ -93,7 +93,7 @@ def read_data_from_historical_data():
 def request_hyperliquid_candles():
     # request the last 48 hours of 1m candles for HYPE/USDC
     current_time = int(time.time() * 1000)
-    start_time = current_time - (48 * 60 * 60 * 1000)
+    start_time = current_time - (3 * 24 * 60 * 60 * 1000)
 
     info = Info(constants.MAINNET_API_URL, skip_ws=True)
     res = info.candles_snapshot("HYPE/USDC", "1m", start_time, current_time)

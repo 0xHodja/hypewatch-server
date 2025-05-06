@@ -32,6 +32,8 @@ else:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+HEARTBEAT_INTERVAL = 30  # seconds
+
 
 class WebsocketListener:
     def __init__(self):
@@ -109,6 +111,17 @@ class WebsocketListener:
             subscribe_message = {"method": "subscribe", "subscription": {"type": "trades", "coin": "@107"}}
             await websocket.send(json.dumps(subscribe_message))
 
+            async def send_heartbeat():
+                while True:
+                    try:
+                        await websocket.send(json.dumps({"method": "ping"}))
+                        await asyncio.sleep(HEARTBEAT_INTERVAL)
+                    except Exception as e:
+                        logger.error(f"Error sending heartbeat: {e}")
+                        break
+
+            asyncio.create_task(send_heartbeat())
+
             while True:
                 try:
                     response = await websocket.recv()
@@ -126,6 +139,17 @@ class WebsocketListener:
         async with websockets.connect(websocket_url) as websocket:
             subscribe_message = {"method": "subscribe", "subscription": {"type": "candle", "coin": "@107", "interval": "1m"}}
             await websocket.send(json.dumps(subscribe_message))
+
+            async def send_heartbeat():
+                while True:
+                    try:
+                        await websocket.send(json.dumps({"method": "ping"}))
+                        await asyncio.sleep(HEARTBEAT_INTERVAL)
+                    except Exception as e:
+                        logger.error(f"Error sending heartbeat: {e}")
+                        break
+
+            asyncio.create_task(send_heartbeat())
 
             while True:
                 try:

@@ -6,3 +6,4 @@ hyperliquid-python-sdk
 numpy
 psycopg2
 websockets
+flask

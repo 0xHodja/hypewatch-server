@@ -7,3 +7,5 @@ numpy
 psycopg2
 websockets
 flask
+gunicorn
+flask-cors

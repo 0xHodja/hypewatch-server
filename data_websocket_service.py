@@ -127,7 +127,6 @@ class WebsocketListener:
                     response = await websocket.recv()
                     data = json.loads(response)
                     if data.get("channel") == "trades":
-                        logger.info(f"Received data: {data}")
                         trade_data = data.get("data")
                         if trade_data:
                             self.db_insert_trade(trade_data)
@@ -156,7 +155,6 @@ class WebsocketListener:
                     response = await websocket.recv()
                     data = json.loads(response)
                     if data.get("channel") == "candle":
-                        logger.info(f"Received data: {data}")
                         candle_data = data.get("data")
                         if candle_data:
                             self.db_insert_candle(candle_data)

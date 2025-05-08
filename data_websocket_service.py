@@ -106,61 +106,69 @@ class WebsocketListener:
             finally:
                 pass
 
+    async def handle_heartbeat(websocket):
+        """Handle client-side heartbeat"""
+        current_time = asyncio.get_event_loop().time()
+        if not hasattr(websocket, "last_heartbeat"):
+            websocket.last_heartbeat = current_time
+        elif current_time - websocket.last_heartbeat >= 15:  # Reduced to 15 seconds
+            heartbeat_message = {"method": "ping"}
+            await websocket.send(json.dumps(heartbeat_message))
+            websocket.last_heartbeat = current_time
+
     async def listen_trades(self):
         async with websockets.connect(websocket_url) as websocket:
             subscribe_message = {"method": "subscribe", "subscription": {"type": "trades", "coin": "@107"}}
             await websocket.send(json.dumps(subscribe_message))
 
-            async def send_heartbeat():
-                while True:
-                    try:
-                        await websocket.send(json.dumps({"method": "ping"}))
-                        await asyncio.sleep(HEARTBEAT_INTERVAL)
-                    except Exception as e:
-                        logger.error(f"Error sending heartbeat: {e}")
-                        break
-
-            asyncio.create_task(send_heartbeat())
-
             while True:
                 try:
                     response = await websocket.recv()
+
+                    if response == "ping":
+                        await websocket.send("pong")
+                        continue
+
                     data = json.loads(response)
                     if data.get("channel") == "trades":
                         trade_data = data.get("data")
                         if trade_data:
-                            self.db_insert_trade(trade_data)
+                            try:
+                                self.db_insert_trade(trade_data)
+                            except Exception as db_exc:
+                                logger.error(f"Failed to insert trade into DB: {db_exc}")
 
                 except Exception as e:
                     logger.error(f"Error processing message: {e}")
+
+                await self.handle_heartbeat(websocket)
 
     async def listen_candles(self):
         async with websockets.connect(websocket_url) as websocket:
             subscribe_message = {"method": "subscribe", "subscription": {"type": "candle", "coin": "@107", "interval": "1m"}}
             await websocket.send(json.dumps(subscribe_message))
 
-            async def send_heartbeat():
-                while True:
-                    try:
-                        await websocket.send(json.dumps({"method": "ping"}))
-                        await asyncio.sleep(HEARTBEAT_INTERVAL)
-                    except Exception as e:
-                        logger.error(f"Error sending heartbeat: {e}")
-                        break
-
-            asyncio.create_task(send_heartbeat())
-
             while True:
                 try:
                     response = await websocket.recv()
+
+                    if response == "ping":
+                        await websocket.send("pong")
+                        continue
+
                     data = json.loads(response)
                     if data.get("channel") == "candle":
                         candle_data = data.get("data")
                         if candle_data:
-                            self.db_insert_candle(candle_data)
+                            try:
+                                self.db_insert_candle(candle_data)
+                            except Exception as db_exc:
+                                logger.error(f"Failed to insert trade into DB: {db_exc}")
 
                 except Exception as e:
                     logger.error(f"Error processing message: {e}")
+
+                await self.handle_heartbeat(websocket)
 
     async def listen(self):
         try:

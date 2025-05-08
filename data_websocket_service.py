@@ -106,7 +106,7 @@ class WebsocketListener:
             finally:
                 pass
 
-    async def handle_heartbeat(websocket):
+    async def handle_heartbeat(self, websocket):
         """Handle client-side heartbeat"""
         current_time = asyncio.get_event_loop().time()
         if not hasattr(websocket, "last_heartbeat"):

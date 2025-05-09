@@ -42,13 +42,12 @@ class WebsocketListener:
     def db_connect(self):
         if self.conn is not None and self.conn.closed == 0:
             return
-        if self.conn is None:
-            try:
-                self.conn = psycopg2.connect(dbname=DB_DATABASE, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
-                logger.info("Connected to the database")
-            except Exception as e:
-                logger.error(f"Error connecting to the database: {e}")
-                raise
+        try:
+            self.conn = psycopg2.connect(dbname=DB_DATABASE, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+            logger.info("Connected to the database")
+        except Exception as e:
+            logger.error(f"Error connecting to the database: {e}")
+            raise
 
     def db_disconnect(self):
         if self.conn is not None:

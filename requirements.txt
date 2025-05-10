@@ -9,3 +9,4 @@ websockets
 flask
 gunicorn
 flask-cors
+pymongo
